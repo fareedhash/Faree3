@@ -1,0 +1,6 @@
+{
+  "name": "MR_KAZAM_FNT_N",
+  "description": "Unified platform with text messaging, private audio/media logs, real-time multiplayer HTML5 Web lobbies, AI prompt-based generative artwork, soft-delete user privacy, and master administration audit dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

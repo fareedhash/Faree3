@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0d0e15;
+            color: #eceff4;
+            font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+            text-align: center;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        #gameCanvas {
+            border: 2px solid #3f51b5;
+            background: #151821;
+            box-shadow: 0 0 20px rgba(63, 81, 181, 0.4);
+            border-radius: 8px;
+            max-width: 95vw;
+            max-height: 60vh;
+            display: block;
+        }
+        h3 {
+            margin: 5px 0;
+            color: #80deea;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+        p {
+            margin: 5px 0 10px 0;
+            font-size: 0.8rem;
+            color: #a0a5c4;
+        }
+        .btn {
+            background: #3f51b5;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            margin-top: 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn:active {
+            background: #303f9f;
+        }
+        #status {
+            margin-top: 5px;
+            font-weight: bold;
+            color: #ff4081;
+            font-size: 1.1rem;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h3>MR_KAZAM: RETRO FIREFIGHT</h3>
+    <p>Tap Screen to Shoot/Thrust! Beat the Rogue Cosmic AI Drone!</p>
+
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+    <div id="status">Active Fight...</div>
+    <button class="btn" onclick="resetGame()">Instant Reboot</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+
+        // Extract player names from URL query params (fallback if not provided)
+        const urlParams = new URLSearchParams(window.location.search);
+        let player1 = urlParams.get('p1') || 'Player 1';
+        let player2 = urlParams.get('p2') || 'AI Drone';
+
+        let gameActive = true;
+        let score = 0;
+
+        // Simple physics state
+        const hero = {
+            x: 80,
+            y: 200,
+            radius: 12,
+            vy: 0,
+            color: '#00e676',
+            bullets: []
+        };
+
+        const boss = {
+            x: 320,
+            y: 200,
+            radius: 18,
+            vy: 2,
+            health: 5,
+            maxHealth: 5,
+            color: '#ff1744',
+            bullets: []
+        };
+
+        // Screen tap / click listener
+        canvas.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            boostHero();
+        });
+        canvas.addEventListener('mousedown', function(e) {
+            boostHero();
+        });
+
+        function boostHero() {
+            if (!gameActive) return;
+            hero.vy = -5.5; // fly upwards
+            // Shoot bullet
+            hero.bullets.push({
+                x: hero.x + 10,
+                y: hero.y,
+                vx: 6,
+                color: '#00e676'
+            });
+        }
+
+        function resetGame() {
+            gameActive = true;
+            score = 0;
+            hero.y = 200;
+            hero.vy = 0;
+            hero.bullets = [];
+            boss.y = 200;
+            boss.vy = 2;
+            boss.health = boss.maxHealth;
+            boss.bullets = [];
+            statusDiv.innerText = "Active Fight...";
+            statusDiv.style.color = "#ff4081";
+        }
+
+        function finishMatch(winner) {
+            gameActive = false;
+            statusDiv.innerText = winner + " WINS MATCH!";
+            statusDiv.style.color = winner === player1 ? '#00e676' : '#ff1744';
+
+            // Communicate back to Native Android via Javascript Interface if available
+            if (window.KazamApp && typeof window.KazamApp.onMatchFinished === 'function') {
+                window.KazamApp.onMatchFinished(winner);
+            }
+        }
+
+        // Main game loop
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw sci-fi grid background
+            ctx.strokeStyle = '#212533';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < canvas.width; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for(let j = 0; j < canvas.height; j += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, j);
+                ctx.lineTo(canvas.width, j);
+                ctx.stroke();
+            }
+
+            if (gameActive) {
+                // Apply gravity to player
+                hero.vy += 0.25;
+                hero.y += hero.vy;
+
+                // Ceiling/Floor boundaries
+                if (hero.y < hero.radius) {
+                    hero.y = hero.radius;
+                    hero.vy = 0;
+                }
+                if (hero.y > canvas.height - hero.radius) {
+                    hero.y = canvas.height - hero.radius;
+                    hero.vy = 0;
+                }
+
+                // AI drone movement
+                boss.y += boss.vy;
+                if (boss.y < boss.radius + 20 || boss.y > canvas.height - boss.radius - 20) {
+                    boss.vy *= -1;
+                }
+
+                // Randomly fire drone bullets
+                if (Math.random() < 0.04) {
+                    boss.bullets.push({
+                        x: boss.x - 10,
+                        y: boss.y,
+                        vx: -5,
+                        color: '#ff1744'
+                    });
+                }
+
+                // Update Hero bullets
+                for (let i = hero.bullets.length - 1; i >= 0; i--) {
+                    let b = hero.bullets[i];
+                    b.x += b.vx;
+                    // Check bounds
+                    if (b.x > canvas.width) {
+                        hero.bullets.splice(i, 1);
+                        continue;
+                    }
+                    // Hit boss
+                    let dx = b.x - boss.x;
+                    let dy = b.y - boss.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < boss.radius + 3) {
+                        boss.health--;
+                        hero.bullets.splice(i, 1);
+
+                        // Bullet flash
+                        ctx.fillStyle = "#ffffff";
+                        ctx.beginPath();
+                        ctx.arc(boss.x, boss.y, boss.radius + 10, 0, Math.PI*2);
+                        ctx.fill();
+
+                        if (boss.health <= 0) {
+                            finishMatch(player1);
+                            break;
+                        }
+                    }
+                }
+
+                // Update Boss bullets
+                for (let i = boss.bullets.length - 1; i >= 0; i--) {
+                    let b = boss.bullets[i];
+                    b.x += b.vx;
+                    // Check bounds
+                    if (b.x < 0) {
+                        boss.bullets.splice(i, 1);
+                        continue;
+                    }
+                    // Hit hero
+                    let dx = b.x - hero.x;
+                    let dy = b.y - hero.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < hero.radius + 3) {
+                        finishMatch(player2);
+                        break;
+                    }
+                }
+            }
+
+            // Draw Hero Player Icon & Shield
+            ctx.fillStyle = hero.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = hero.color;
+            ctx.beginPath();
+            ctx.arc(hero.x, hero.y, hero.radius, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw Hero Gun details
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(hero.x + 5, hero.y - 3, 8, 6);
+
+            // Draw Name tag side-by-side above characters
+            ctx.fillStyle = '#eceff4';
+            ctx.font = '10px sans-serif';
+            ctx.fillText(player1, hero.x - 20, hero.y - 18);
+
+            // Draw Boss AI Icon
+            ctx.fillStyle = boss.color;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = boss.color;
+            ctx.beginPath();
+            ctx.moveTo(boss.x - boss.radius, boss.y);
+            ctx.lineTo(boss.x + boss.radius, boss.y - boss.radius);
+            ctx.lineTo(boss.x + boss.radius, boss.y + boss.radius);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Draw Name tag above AI
+            ctx.fillStyle = '#eceff4';
+            ctx.fillText(player2, boss.x - 25, boss.y - 25);
+
+            // Draw Boss Health Bar
+            ctx.fillStyle = '#3a3f58';
+            ctx.fillRect(boss.x - boss.radius, boss.y - 20, boss.radius * 2, 4);
+            ctx.fillStyle = '#ff1744';
+            let healthRatio = Math.max(0, boss.health / boss.maxHealth);
+            ctx.fillRect(boss.x - boss.radius, boss.y - 20, boss.radius * 2 * healthRatio, 4);
+
+            // Draw Hero bullets
+            for (let b of hero.bullets) {
+                ctx.fillStyle = b.color;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw Boss bullets
+            for (let b of boss.bullets) {
+                ctx.fillStyle = b.color;
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = b.color;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // Start loop
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
